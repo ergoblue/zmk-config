@@ -1,0 +1,11 @@
+manifest:
+  remotes:
+    - name: ergoblue
+      url-base: https://github.com/ergoblue
+  projects:
+    - name: zmk
+      remote: ergoblue
+      revision: v20201111
+      import: app/west.yml
+  self:
+    path: config

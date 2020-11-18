@@ -1,0 +1,62 @@
+on: [push, pull_request, workflow_dispatch]
+
+name: Build
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    name: Build Test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Cache west modules
+        uses: actions/cache@v2
+        env:
+          cache-name: cache-zephyr-modules
+        with:
+          path: |
+            modules/
+            tools/
+            zephyr/
+            bootloader/
+            zmk/
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('manifest-dir/west.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-build-${{ env.cache-name }}-
+            ${{ runner.os }}-build-
+            ${{ runner.os }}-
+      - name: West Init
+        uses: 'docker://zmkfirmware/zephyr-west-action-arm:latest'
+        id: west-init
+        with:
+          args: 'init "-l config"'
+      - name: West Update
+        uses: 'docker://zmkfirmware/zephyr-west-action-arm:latest'
+        id: west-update
+        with:
+          args: 'update'
+      - name: West Config Zephyr Base
+        uses: 'docker://zmkfirmware/zephyr-west-action-arm:latest'
+        id: west-config
+        with:
+          args: 'config "--global zephyr.base-prefer configfile"'
+      - name: West Zephyr Export
+        uses: 'docker://zmkfirmware/zephyr-west-action-arm:latest'
+        id: west-zephyr-export
+        with:
+          args: 'zephyr-export'
+      - name: West Build (ErgoBlue Central)
+        uses: 'docker://zmkfirmware/zephyr-west-action-arm:latest'
+        id: west-build-ergoblue-central
+        with:
+          args: 'build "-s zmk/app -b nrf52840dongle_nrf52840 -- -DSHIELD=ergoblue_central -DZMK_CONFIG=/github/workspace/config"'
+      - name: ErgoBlue DTS File
+        if: ${{ always() }}
+        run: cat -n build/zephyr/nrf52840dongle_nrf52840.dts.pre.tmp
+      - name: ErgoBlue Central Kconfig file
+        run: cat build/zephyr/.config | grep -v "^#" | grep -v "^$"
+      - name: Archive (ErgoBlue Central)
+        uses: actions/upload-artifact@v2
+        with:
+          name: firmware
+          path: build/zephyr/zmk.hex
